@@ -324,3 +324,61 @@ print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
+# In[43]:
+
+
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import classification_report
+
+
+# In[44]:
+
+
+X = df.drop('Revenue', axis=1)    
+y = df['Revenue']
+
+
+# In[45]:
+
+
+# Splitting the dataset into the Training set and Test set
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+
+# In[46]:
+
+
+# Initializing the RandomForestClassifier
+random_forest = RandomForestClassifier(random_state=42)
+
+
+# In[47]:
+
+
+# Setting up the GridSearch to find the best parameters
+param_grid = {
+    'n_estimators': [100, 200, 300],  # Number of trees in the forest
+    'max_depth': [10, 20, 30, None],  # Maximum depth of the tree
+    'min_samples_split': [2, 5, 10],  # Minimum number of samples required to split an internal node
+    'min_samples_leaf': [1, 2, 4]  # Minimum number of samples required at each leaf node
+}
+
+grid_search = GridSearchCV(estimator=random_forest, param_grid=param_grid, cv=3, n_jobs=-1, verbose=2)
+grid_search.fit(X_train, y_train)
+
+# Best parameters and model
+best_rf = grid_search.best_estimator_
+
+# Making predictions with the best model
+y_pred = best_rf.predict(X_test)
+
+# Generating the classification report
+report = classification_report(y_test, y_pred)
+print(report)
+
+
+# In[ ]:
+
+
+
+
