@@ -1,17 +1,3 @@
-<<<<<<< HEAD
-# ASSESSMENT 3
-
-## CONTRIBUTORS
-[Mai Chieu Thuy - s3877746](https://github.com/thuyiswater)
-
-[Le Cam Tu - s3915195](https://github.com/hydl19903)
-
-[Dinh Ngoc Minh - s3925113](https://github.com/dinhminh0307)
-
-[Nguyen Mau Bach - s3926937](https://github.com/Helixu38)
-
-## HOW TO RUN
-=======
 ## Dataset information
 | **Variable**                | **Type**    | **Data Type** | **Missing Values** |
 |-----------------------------|-------------|---------------|--------------------|
@@ -45,4 +31,3 @@ The `Bounce Rate`, `Exit Rate` and `Page Value` features represent the metrics m
 - The `Page Value` feature represents the average value for a web page that a user visited before completing an e-commerce transaction.
 
 The `Special Day` feature indicates the closeness of the site visiting time to a specific special day (e.g. Mother’s Day, Valentine's Day) in which the sessions are more likely to be finalized with transaction. The value of this attribute is determined by considering the dynamics of e-commerce such as the duration between the order date and delivery date. For example, for Valentina’s day, this value takes a nonzero value between February 2 and February 12, zero before and after this date unless it is close to another special day, and its maximum value of 1 on February 8. The dataset also includes operating system, browser, region, traffic type, visitor type as returning or new visitor, a Boolean value indicating whether the date of the visit is weekend, and month of the year.
->>>>>>> b2108a6dff49d02865d68af70841b182a6406c6f
