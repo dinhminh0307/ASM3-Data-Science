@@ -1,6 +1,20 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
+
+
+
+# In[145]:
+
+
 # # Assessment 3 - Online Shoppers Purchasing Intention
 # #### Objective: 
 
+
+# In[146]:
 
 
 # data manipulation
@@ -39,6 +53,8 @@ from IPython.display import display
 import warnings
 warnings.filterwarnings('ignore')
 
+
+# In[147]:
 
 
 # utility functions
@@ -89,6 +105,8 @@ def countplot_value(df, columns, figsize=(20, 30)):
 # ### 1.1. Data Loading
 
 
+# In[148]:
+
 
 # load the dataset
 file_path = 'online_shoppers_intention.csv'
@@ -98,15 +116,21 @@ df = pd.read_csv(file_path)
 # ### 1.2. Dataset Observation
 
 
+# In[149]:
+
 
 # display the first 5 rows of the dataset
 display(df.head())
 
 
+# In[150]:
+
 
 # summary of the dataset
 df.info()
 
+
+# In[151]:
 
 
 df.describe()
@@ -128,16 +152,22 @@ df.describe()
 # ### 1.3. Detailed Analysis and Cleaning
 
 
+# In[152]:
+
 
 # create a copy of the dataframe to store the cleaned data
 df_clean = df.copy();
 
+
+# In[153]:
 
 
 # display the unique values of the 'Month' and 'VisitorType' columns
 print(df_clean['Month'].unique())
 print(df_clean['VisitorType'].unique())
 
+
+# In[154]:
 
 
 # fix typos in the 'Month' column
@@ -150,6 +180,8 @@ df_clean = df_clean.sort_values('Month')
 print(df_clean['Month'].unique())
 
 
+# In[155]:
+
 
 # convert the 'Month' and 'Revenue' columns to numerical
 bool_columns = ['Weekend', 'Revenue']
@@ -161,11 +193,17 @@ df_clean.info()
 
 # #### 1.3.1. Univariate Analysis of Numerical values
 
+
+# In[156]:
+
+
 from sklearn.preprocessing import LabelEncoder
 encoder = LabelEncoder()
 df_clean['VisitorType'] = encoder.fit_transform(df_clean['VisitorType'])
 print(df_clean['VisitorType'])
 
+
+# In[157]:
 
 
 columns = ["Administrative", "Administrative_Duration", "Informational", "Informational_Duration",
@@ -184,6 +222,8 @@ plotbox_and_hist(df_clean, columns)
 
 # #### 1.3.2. Univariate Analysis of Categorical values
 
+
+# In[158]:
 
 
 columns = ["Month", "OperatingSystems", "Browser", "Region", "TrafficType", "VisitorType", "Weekend", "Revenue"]
@@ -207,12 +247,16 @@ countplot_value(df_clean, columns)
 # #### 1.3.3. Multivariate Analysis
 
 
+# In[159]:
+
 
 sns.pairplot(df_clean, hue="Revenue")
 
 
 # #### 1.3.4. Cleaning Data
 
+
+# In[160]:
 
 
 # remove outliers with low frequencies
@@ -228,6 +272,8 @@ df_clean = df_clean[((df_clean['Administrative'] < 25) &
                      (df_clean['PageValues'] < 250))]
 
 
+# In[161]:
+
 
 # verify removal
 rows_remove = len(df_temp) - len(df_clean)
@@ -238,6 +284,8 @@ print(f"The numbers of rows removed: {rows_remove}")
 
 # ### 2.1. Preprocessing Features and Plotting Correlations
 
+
+# In[162]:
 
 
 # since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
@@ -255,6 +303,8 @@ df_features.drop("Month", axis=1, inplace=True)
 df_features.drop("VisitorType", axis=1, inplace=True)
 
 
+# In[163]:
+
 
 # correlation analysis
 target_df = df_features['Revenue']
@@ -270,12 +320,6 @@ ax = plt.xticks(rotation=85)
 ax = plt.title("Correlations between features")
 
 
-# ### 2.2. Analysis and Hypothesis Proposal
-# #### 2.2.1. Regression problem
-# 
-# #### 2.2.2. Clustering problem
-# 
-# #### 2.2.3. Classification problem
 
 # ## 3. Data Modelling
 
@@ -286,10 +330,53 @@ ax = plt.title("Correlations between features")
 # ### 3.3. Classification
 
 
+# ### 2.2. Analysis and Hypothesis Proposal
+# #### 2.2.1. Regression problem
+#  
+# #### 2.2.2. Clustering problem
+#  
+# #### 2.2.3. Classification problem
+# ##### 1. Visitor Engagement
+# - **Observation**: Scatterplots of `Administrative_Duration`, `Informational_Duration`, and `ProductRelated_Duration` against `Revenue` often show higher densities of sessions with greater durations linked to purchases (`Revenue = True`).
+#   - `PageValues` seems to have a strong positive correlation with `Revenue`. Higher page values indicate a higher likelihood of purchases, aligning with the hypothesis.
+# 
+# - **Hypothesis**: Higher engagement leads to higher purchase probabilities.
+#   - Higher values for `Administrative_Duration`, `Informational_Duration`, and `ProductRelated_Duration` might indicate greater visitor interest, resulting in purchases.
+#   - A higher `PageValues` score is likely to correlate positively with purchases.
+# 
+# ##### 2. Bounce and Exit Rates
+# - **Observation**: From scatterplots of `BounceRates` and `ExitRates` against `Revenue`, sessions with higher bounce rates (`BounceRates`) and exit rates (`ExitRates`) generally correspond to no purchases (`Revenue = False`), which supports the hypothesis of poor user experience reducing purchase likelihood.
+# 
+# - **Hypothesis**: Poor user experience decreases purchase likelihood.
+#   - Higher `BounceRates` and `ExitRates` might indicate user dissatisfaction, leading to fewer purchases.
+# 
+# ##### 3. Time Factors
+# - **Observation**: Visualizations of `SpecialDay` against `Revenue` show an increase in purchases as the proximity to a special day increases. Similarly, analysis of `Month` against `Revenue` highlights seasonal trends, with months like November showing higher purchase probabilities, likely due to shopping holidays like Black Friday.
+# 
+# - **Hypothesis**: Shopping behavior depends on timing.
+#   - Visits closer to a `SpecialDay` (e.g., Black Friday or holidays) might have a higher likelihood of purchases.
+#   - Certain months (`Month`) might reflect seasonal shopping trends, influencing purchase behavior.
+# 
+# ##### 4. User Types
+# - **Observation**: From categorical plots of `VisitorType` and `Revenue`, returning visitors have a noticeably higher likelihood of generating revenue compared to new visitors. This observation supports the hypothesis that returning visitors are more likely to purchase.
+# 
+# - **Hypothesis**: Returning visitors are more likely to purchase.
+#   - Returning visitors (`VisitorType = Returning_Visitor`) might have a higher likelihood of making a purchase compared to new visitors (`VisitorType = New_Visitor`).
+# 
+# ##### 5. Technical Features
+# - **Observation**: Bar charts and heatmaps for `OperatingSystems`, `Browser`, and `TrafficType` reveal varying purchase probabilities across categories. For instance, some browsers or traffic sources have a stronger association with purchases, supporting the hypothesis that technical accessibility impacts purchases.
+# 
+# - **Hypothesis**: Technical accessibility impacts purchases.
+#   - Different `OperatingSystems`, `Browser`, and `TrafficType` values might influence the likelihood of purchases based on usability or accessibility.
+# 
+# ##### 6. Weekend Influence
+# - **Observation**: A categorical plot of `Weekend` against `Revenue` shows slight differences in purchase likelihood between weekend and weekday sessions. This observation suggests some behavioral differences in shopping patterns based on the day of the week.
+# - **Hypothesis**: Shopping behavior differs on weekends.
+#   - Visits during weekends (`Weekend = True`) might have different purchase rates compared to weekday visits.
+# 
+# ---
 
-
-
-
+# In[164]:
 
 
 X = df_clean.drop(columns=['Revenue'])
@@ -299,6 +386,8 @@ Y = df_clean['Revenue'].astype(int)
 # ### Check the data imbalancing
 
 
+# In[165]:
+
 
 value_counts = Y.value_counts()
 print(value_counts)
@@ -307,6 +396,8 @@ print(value_counts)
 # ### Oversample the imbalance data
 # 
 
+
+# In[166]:
 
 
 from sklearn.preprocessing import StandardScaler
@@ -320,6 +411,8 @@ ros = RandomOverSampler()
 X_KNN, Y_KNN = ros.fit_resample(X, Y) # take more from the less class to increase its size
 
 
+# In[167]:
+
 
 value_counts = Y_KNN.value_counts()
 print(value_counts)
@@ -328,9 +421,57 @@ print(value_counts)
 # ## Spliting the data
 
 
+# In[168]:
 
-x_train, x_test, y_train, y_test = train_test_split(X_KNN, Y_KNN, test_size = 0.2, random_state = 0)
 
+from sklearn.feature_selection import RFE
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+import pandas as pd
+
+# Assuming X_KNN and Y_KNN are already defined
+x_train_origin, x_test_origin, y_train_origin, y_test_origin = train_test_split(X_KNN, Y_KNN, test_size=0.2, random_state=0)
+
+# Permutation Importance for KNN
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(x_train_origin, y_train_origin)
+
+# Compute permutation importance
+perm_importance = permutation_importance(knn, x_test_origin, y_test_origin, n_repeats=10, random_state=42)
+
+# Get feature importance scores
+perm_importance_df = pd.DataFrame({
+    'Feature': X_KNN.columns,
+    'Importance': perm_importance.importances_mean
+}).sort_values(by='Importance', ascending=False)
+
+# Save or print the results
+print(perm_importance_df)  # To print the importance scores
+perm_importance_df.to_csv('permutation_importance.csv', index=False)  # Save as CSV file
+
+
+# In[169]:
+
+
+## Select features to feed
+
+selected_features = [
+    "PageValues",
+    "ProductRelated_Duration",
+    "Administrative_Duration",
+    "Informational_Duration",
+    "ProductRelated"
+]
+
+# Creating a new dataset with the selected features
+X_KNN_selected = X_KNN[selected_features]
+
+# Assuming X_KNN and Y_KNN are already defined
+x_train, x_test, y_train, y_test = train_test_split(X_KNN_selected, Y_KNN, test_size=0.2, random_state=0)
+
+
+# In[170]:
 
 
 # Standardize the features
@@ -339,6 +480,8 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
 
+# In[171]:
+
 
 param_dist = {
     'n_neighbors': randint(3, 15),
@@ -346,6 +489,8 @@ param_dist = {
     'metric': ['euclidean', 'manhattan', 'minkowski']
 }
 
+
+# In[172]:
 
 
 # Initialize the KNN classifier
@@ -356,16 +501,22 @@ random_search = RandomizedSearchCV(estimator=knn, param_distributions=param_dist
 random_search.fit(x_train, y_train)
 
 
+# In[173]:
+
 
 # Get the best parameters and best estimator
 best_params = random_search.best_params_
 best_knn = random_search.best_estimator_
 
 
+# In[174]:
+
 
 # Evaluate the best model
 y_pred = best_knn.predict(x_test)
 
+
+# In[175]:
 
 
 cm = confusion_matrix(y_test, y_pred)
@@ -374,6 +525,8 @@ disp.plot(cmap='Blues')
 plt.title('Confusion Matrix')
 plt.show()
 
+
+# In[176]:
 
 
 # Print the best parameters and evaluation metrics
@@ -385,25 +538,35 @@ print(classification_report(y_test, y_pred))
 print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
 
+# In[177]:
+
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 
+
+# In[178]:
 
 
 X = df_clean.drop('Revenue', axis=1)    
 y = df_clean['Revenue']
 
 
+# In[179]:
+
 
 # Splitting the dataset into the Training set and Test set
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
+# In[180]:
+
 
 # Initializing the RandomForestClassifier
 random_forest = RandomForestClassifier(random_state=42)
 
+
+# In[181]:
 
 
 # Setting up the GridSearch to find the best parameters
