@@ -1,181 +1,339 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[99]:
+# In[1]:
 
 
+# # Assessment 3 - Online Shoppers Purchasing Intention
+# #### Objective: 
+
+
+# In[2]:
+
+
+# data manipulation
 import pandas as pd
+import numpy as np
+
+# data visualization
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# machine learning
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.feature_selection import f_classif, SelectKBest
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import (classification_report, confusion_matrix, roc_auc_score, 
+                             roc_curve, accuracy_score, precision_score, recall_score, 
+                             f1_score, matthews_corrcoef)
+
+# dimensionality reduction
+from sklearn.decomposition import PCA
+
+# clustering
+from sklearn.cluster import KMeans, DBSCAN
+
+# data preprocessing
+from sklearn.preprocessing import MinMaxScaler
+
+# handling imbalanced data
+from imblearn.over_sampling import SMOTE
+
+# displaying outputs in jupyter
+from IPython.display import display
+
+# ignore warnings
+import warnings
+warnings.filterwarnings('ignore')
+
+
+# In[3]:
+
+
+# utility functions
+
+def plotbox_and_hist(df, columns, figsize=(30, 80)):
+    fig, axes = plt.subplots(len(columns), 2, figsize=figsize)
+
+    for i, column in enumerate(columns):
+        sns.boxplot(x=df[column], ax=axes[i, 0])
+        sns.histplot(x=df[column], ax=axes[i, 1])
+
+    plt.tight_layout()
+    plt.show()
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-file_path = 'online_shoppers_intention.csv';
-df = pd.read_csv(file_path)
+def countplot_value(df, columns, figsize=(20, 30)):
+    # Compute the number of rows and columns for subplots
+    num_columns = 2
+    num_rows = (len(columns) + 1) // num_columns  # Ensures proper grid size for odd numbers
+    
+    fig, axes = plt.subplots(num_rows, num_columns, figsize=figsize)
+    axes = axes.flatten()  # Flatten the axes array for easy iteration
 
+    for i, column in enumerate(columns):
+        ax = axes[i]
+        sns.countplot(x=df[column], ax=ax)
+        
+        # Annotate bar heights
+        for p in ax.patches:
+            ax.annotate(f'{p.get_height()}', 
+                        (p.get_x() + p.get_width() / 2., p.get_height()), 
+                        ha='center', va='center', 
+                        xytext=(0, 5), textcoords='offset points')
+        ax.set_title(f'{column} Counts')
 
-# In[100]:
+    # Remove any unused subplot axes
+    for j in range(len(columns), len(axes)):
+        fig.delaxes(axes[j])
 
-
-df.head()
-
-
-# In[101]:
-
-
-df.info()
-
-
-# In[102]:
-
-
-bool_columns = ['Weekend', 'Revenue']
-df[bool_columns] = df[bool_columns].astype(int)
-
-# Verify the conversion
-df.info()
-
-
-# In[103]:
-
-
-df.isnull().sum()
-
-
-# In[104]:
-
-
-df["Month"] = df["Month"].replace("June", "Jun") # 'Jun' is spelt as 'June' in raw data
-
-
-#  Sort by Month
-
-# In[105]:
-
-
-months = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-    ]
-
-df["Month"] = pd.Categorical(df["Month"], categories=months, ordered=True)
-df = df.sort_values("Month")
-
-
-# ## Visualize data distribution
-
-# In[106]:
-
-
-numerical_features = ['Administrative', 'Administrative_Duration', 'Informational', 'Informational_Duration',
-                      'ProductRelated', 'ProductRelated_Duration', 'BounceRates', 'ExitRates', 'PageValues', 'SpecialDay']
-
-for feature in numerical_features:
-    plt.figure(figsize=(8, 4))
-    sns.histplot(df[feature], kde=True, bins=30, color='blue')
-    plt.title(f'Distribution of {feature}')
-    plt.xlabel(feature)
-    plt.ylabel('Frequency')
+    plt.tight_layout()
     plt.show()
 
 
-# ### Distribution of Visit by month
+# ## 1. Retrieving and Preparing the Data
 
-# In[107]:
-
-
-plt.figure(figsize=(10, 6))
-sns.countplot(x='Month', data=df, order=df['Month'].value_counts().index, palette='viridis')
-plt.title('Distribution of Visits by Month')
-plt.xlabel('Month')
-plt.ylabel('Count')
-plt.show()
+# ### 1.1. Data Loading
 
 
-# ### Distribution of the Revenue
-
-# In[108]:
+# In[4]:
 
 
-plt.figure(figsize=(8, 4))
-sns.countplot(x='Revenue', data=df, palette='Set2')
-plt.title('Distribution of Revenue (Target)')
-plt.xlabel('Revenue (False=No, True=Yes)')
-plt.ylabel('Count')
-plt.show()
+# load the dataset
+file_path = 'online_shoppers_intention.csv'
+df = pd.read_csv(file_path)
 
 
-# ## Distribution of Visitor Types
-
-# In[109]:
+# ### 1.2. Dataset Observation
 
 
-plt.figure(figsize=(8, 4))
-sns.countplot(x='VisitorType', data=df, palette='coolwarm')
-plt.title('Distribution of Visitor Types')
-plt.xlabel('Visitor Type')
-plt.ylabel('Count')
-plt.show()
+# In[5]:
 
 
-# ## Feature Engineering
-
-# In[110]:
-
-
-# Select only numeric columns for correlation analysis
-numeric_df = df.select_dtypes(include=['float64', 'int64'])
-
-# Compute the correlation matrix
-corrMatrix = numeric_df.corr()
-
-# Style the correlation matrix for visualization
-corrMatrix.style.background_gradient(cmap='Blues')
+# display the first 5 rows of the dataset
+display(df.head())
 
 
-# In[111]:
+# In[6]:
 
 
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.feature_selection import RFE
-from sklearn.compose import ColumnTransformer
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, ConfusionMatrixDisplay
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from imblearn.over_sampling import RandomOverSampler
+# summary of the dataset
+df.info()
 
 
-# ## Encoding the categorical column
-
-# In[112]:
+# In[7]:
 
 
-# Perform one-hot encoding for categorical features: 'Month' and 'VisitorType'
-df = pd.get_dummies(df, columns=['Month', 'VisitorType'], drop_first=True)
-
-# Display the first few rows of the transformed dataset
-df.head()
+df.describe()
 
 
-# In[113]:
+# ##### Analysis
+# The dataset contains 12,330 rows and 18 columns. There are no missing values across any of the columns, as all 18 attributes have 12,330 non-null entries.
+# 
+# The data types are primarily integers and floats, with a few categorical variables (object types) like **Month** and **VisitorType**, as well as Boolean variables like **Weekend** and **Revenue**. The attributes can be categorized as follows:
+# 
+# - Categorical values: **Month**, **VisitorType**.
+# - Numerical values:
+#   - Discrete: **Administrative**, **Informational**, **ProductRelated**, **OperatingSystems**, **Browser**, **Region**, **TrafficType**.
+#   - Continuous: **Administrative_Duration**, **Informational_Duration**, **ProductRelated_Duration**, **BounceRates**, **ExitRates**, **PageValues**, **SpecialDay**.
+#   
+# The **Revenue** column is a binary variable indicating whether a transaction resulted in revenue. The **Weekend** column is also Boolean, representing whether the visit occurred on the weekend.
+# Further analysis can be conducted to explore relationships between these variables, especially the conversion-related columns like **Revenue**.
+
+# ### 1.3. Detailed Analysis and Cleaning
 
 
-X = df.drop(columns=['Revenue'])
-Y = df['Revenue'].astype(int)
+# In[8]:
+
+
+# create a copy of the dataframe to store the cleaned data
+df_clean = df.copy();
+
+
+# In[9]:
+
+
+# display the unique values of the 'Month' and 'VisitorType' columns
+print(df_clean['Month'].unique())
+print(df_clean['VisitorType'].unique())
+
+
+# In[10]:
+
+
+# fix typos in the 'Month' column
+df_clean['Month'] = df_clean['Month'].replace({'June': 'Jun'})
+# convert the 'Month' column to numerical values
+month_map = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
+df_clean['Month'] = df_clean['Month'].map(month_map)
+df_clean = df_clean.sort_values('Month')
+# verify the changes
+print(df_clean['Month'].unique())
+
+
+# In[11]:
+
+
+# convert the 'Month' and 'Revenue' columns to numerical
+bool_columns = ['Weekend', 'Revenue']
+df_clean[bool_columns] = df_clean[bool_columns].astype(int)
+
+# verify the conversion
+df_clean.info()
+
+
+# #### 1.3.1. Univariate Analysis of Numerical values
+
+
+# In[12]:
+
+
+columns = ["Administrative", "Administrative_Duration", "Informational", "Informational_Duration",
+           "ProductRelated", "ProductRelated_Duration", "BounceRates", "ExitRates", "PageValues",
+           "SpecialDay"]
+
+plotbox_and_hist(df_clean, columns)
+
+
+# ##### Analysis
+# - Histograms: Most features are right-skewed, with values concentrated on the lower end and long tails extending to higher values. Features like **Administrative** and **Administrative_Duration** show that most sessions involve minimal administrative activities, with outliers at higher values. **Informational** and **Informational_Duration** follow a similar pattern, suggesting that informational activities are not common in most sessions. **ProductRelated** and **ProductRelated_Duration** have a broader spread compared to administrative and informational features. This indicates more varied user engagement with product-related pages, although there are still some significant outliers. **BounceRates** and **ExitRates** are mostly near zero, showing that users usually stay on the site instead of leaving immediately. **PageValues** is skewed with most values being zero, while a few sessions have high values, showing only a small number of sessions generate significant revenue. **SpecialDay** has specific peaks that correspond to certain predefined special days in the data.
+# 
+# - Boxplots: Many features have visible outliers, represented by points beyond the whiskers of the boxplot. **Administrative_Duration** and **Informational_Duration** show tight interquartile ranges (IQRs) with outliers at higher values, confirming that most sessions have minimal durations for these activities. **ProductRelated_Duration** has a wider IQR, reflecting more variability in user interactions with product pages, but also includes a few extreme outliers. **BounceRates** and **ExitRates** have very narrow IQRs, with most values near zero, but occasional outliers suggest some sessions have high rates. **PageValues** has a compact IQR but includes extreme outliers, reflecting rare but impactful sessions with high page values. **SpecialDay** does not show significant outliers since its values are predefined and specific.
+# 
+# Further analysis will help us decide whether to clean datapoints, apply data imputation, or drop the problematic columns.
+
+# #### 1.3.2. Univariate Analysis of Categorical values
+
+
+# In[13]:
+
+
+columns = ["Month", "OperatingSystems", "Browser", "Region", "TrafficType", "VisitorType", "Weekend", "Revenue"]
+
+countplot_value(df_clean, columns)
+
+
+# ##### Analysis
+# There are heavy imbalances across all categorical variables, specifically:
+# - **Month**: March and November have the highest counts, while other months have significantly lower counts.
+# - **OperatingSystems**: Operating systems 1, 2, and 3 dominate the data, while other systems have lower counts.
+# - **Browser**: Browsers 1 and 2 have high counts, while other browsers show much lower counts.
+# - **Region**: Regions 1 and 2 represent most of the data, with other regions showing significantly lower counts.
+# - **TrafficType**: Traffic types 1 and 2 have higher counts, while other types are underrepresented.
+# - **VisitorType**: Returning visitors are the most common, while new visitors and the 'other' category are less frequent.
+# - **Weekend**: Non-weekend visits have the highest count, while weekend visits are much less frequent.
+# - **Revenue**: Non-revenue generating visits dominate, while revenue-generating visits are much fewer.
+# 
+# Overall, imbalances could adversely affect the accuracy of predictions or analyses. Data imputation techniques might be considered to address this issue.
+
+# #### 1.3.3. Multivariate Analysis
+
+
+# In[14]:
+
+
+sns.pairplot(df_clean, hue="Revenue")
+
+
+# ##### Analysis
+# My eyes
+
+# #### 1.3.4. Cleaning Data
+
+
+# In[15]:
+
+
+# remove outliers with low frequencies
+df_temp = df_clean.copy()
+df_clean = df_clean[((df_clean['Administrative'] < 25) & 
+                     (df_clean['Administrative_Duration'] < 2000) & 
+                     (df_clean['Informational'] < 15) & 
+                     (df_clean['Informational_Duration'] < 1750) & 
+                     (df_clean['ProductRelated'] < 475) & 
+                     (df_clean['ProductRelated_Duration'] < 30000) & 
+                     (df_clean['BounceRates'] < 0.175) & 
+                     (df_clean['ExitRates'] < 0.19) &
+                     (df_clean['PageValues'] < 250))]
+
+
+# In[16]:
+
+
+# verify removal
+rows_remove = len(df_temp) - len(df_clean)
+print(f"The numbers of rows removed: {rows_remove}")
+
+
+# ## 2. Feature Engineering
+
+
+# In[17]:
+
+
+# since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
+# we will drop these columns.
+df_features = df.copy()
+df_features = df_clean.drop(columns=["OperatingSystems", "Browser", "Region", "TrafficType"])
+
+# apply one-hot encoding to 'VisitorType' and concatenate with the original DataFrame
+df_features = pd.concat([df_features, pd.get_dummies(df_features["VisitorType"], prefix='VisitorType_')], axis=1)
+
+# drop the original 'VisitorType' column
+df_features.drop("VisitorType", axis=1, inplace=True)
+
+
+# In[18]:
+
+
+# correlation analysis
+target_df = df_features['Revenue']
+
+all_corr = df_features.corr(method = 'pearson')
+
+mask = np.zeros_like(all_corr, dtype=bool)
+mask[np.triu_indices_from(mask)] = True
+
+ax = plt.figure(figsize=(10, 10))
+ax = sns.heatmap(all_corr, cmap='Blues', annot=True, fmt='.2f', mask = mask)
+ax = plt.xticks(rotation=85)
+ax = plt.title("Correlations between features")
+
+
+# ##### Hypothesis
+# 1. Regression
+# 2. Clustering
+# 3. Classification
+
+# ## 3. Data Modelling
+
+# ### 3.1. Regression
+
+# ### 3.2. Clustering
+
+# ### 3.3. Classification
+
+
+# In[ ]:
+
+
+
+
+
+# In[49]:
+
+
+X = df_features.drop(columns=['Revenue'])
+Y = df_features['Revenue'].astype(int)
 
 
 # ### Check the data imbalancing
 
-# In[114]:
+
+# In[50]:
 
 
 value_counts = Y.value_counts()
@@ -185,29 +343,38 @@ print(value_counts)
 # ### Oversample the imbalance data
 # 
 
-# In[115]:
+
+# In[51]:
 
 
+from sklearn.preprocessing import StandardScaler
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.neighbors import KNeighborsClassifier
+
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import randint
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 ros = RandomOverSampler()
-X, Y = ros.fit_resample(X, Y) # take more from the less class to increase its size
+X_KNN, Y_KNN = ros.fit_resample(X, Y) # take more from the less class to increase its size
 
 
-# In[116]:
+# In[53]:
 
 
-value_counts = Y.value_counts()
+value_counts = Y_KNN.value_counts()
 print(value_counts)
 
 
 # ## Spliting the data
 
-# In[117]:
+
+# In[54]:
 
 
-x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
+x_train, x_test, y_train, y_test = train_test_split(X_KNN, Y_KNN, test_size = 0.2, random_state = 0)
 
 
-# In[118]:
+# In[55]:
 
 
 # Standardize the features
@@ -216,58 +383,7 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
 
-# ## KNN classification
-
-# In[119]:
-
-
-knn_model = KNeighborsClassifier(n_neighbors=5)
-knn_model.fit(x_train, y_train)
-
-
-# In[120]:
-
-
-y_pred = knn_model.predict(x_test)
-
-
-# ## Print the matrix to see the accuracy of the model
-
-# In[121]:
-
-
-cm = confusion_matrix(y_test, y_pred)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-disp.plot(cmap='Blues')
-plt.title('Confusion Matrix')
-plt.show()
-
-
-# ## Evaluate the model
-
-# In[122]:
-
-
-# Print the best parameters and evaluation metrics
-print("Confusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
-print("\nAccuracy:", accuracy_score(y_test, y_pred))
-
-
-# ## KNN Model Improvement
-
-# ### Hyperparameter tunning with Randomized Search
-
-# In[123]:
-
-
-from sklearn.model_selection import RandomizedSearchCV
-from scipy.stats import randint
-
-
-# In[124]:
+# In[56]:
 
 
 param_dist = {
@@ -277,7 +393,7 @@ param_dist = {
 }
 
 
-# In[125]:
+# In[57]:
 
 
 # Initialize the KNN classifier
@@ -288,7 +404,7 @@ random_search = RandomizedSearchCV(estimator=knn, param_distributions=param_dist
 random_search.fit(x_train, y_train)
 
 
-# In[126]:
+# In[58]:
 
 
 # Get the best parameters and best estimator
@@ -296,14 +412,14 @@ best_params = random_search.best_params_
 best_knn = random_search.best_estimator_
 
 
-# In[127]:
+# In[59]:
 
 
 # Evaluate the best model
 y_pred = best_knn.predict(x_test)
 
 
-# In[128]:
+# In[60]:
 
 
 cm = confusion_matrix(y_test, y_pred)
@@ -313,7 +429,7 @@ plt.title('Confusion Matrix')
 plt.show()
 
 
-# In[129]:
+# In[61]:
 
 
 # Print the best parameters and evaluation metrics
@@ -324,35 +440,36 @@ print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
-# In[43]:
+
+# In[62]:
 
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 
 
-# In[44]:
+# In[63]:
 
 
-X = df.drop('Revenue', axis=1)    
-y = df['Revenue']
+X = df_features.drop('Revenue', axis=1)    
+y = df_features['Revenue']
 
 
-# In[45]:
+# In[64]:
 
 
 # Splitting the dataset into the Training set and Test set
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
-# In[46]:
+# In[65]:
 
 
 # Initializing the RandomForestClassifier
 random_forest = RandomForestClassifier(random_state=42)
 
 
-# In[47]:
+# In[66]:
 
 
 # Setting up the GridSearch to find the best parameters
@@ -375,9 +492,6 @@ y_pred = best_rf.predict(X_test)
 # Generating the classification report
 report = classification_report(y_test, y_pred)
 print(report)
-
-
-# In[ ]:
 
 
 
