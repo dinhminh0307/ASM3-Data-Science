@@ -379,6 +379,10 @@ ax = plt.title("Correlations between features")
 # In[164]:
 
 
+
+# In[20]:
+
+
 X = df_clean.drop(columns=['Revenue'])
 Y = df_clean['Revenue'].astype(int)
 
@@ -472,6 +476,8 @@ x_train, x_test, y_train, y_test = train_test_split(X_KNN_selected, Y_KNN, test_
 
 
 # In[170]:
+
+# In[25]:
 
 
 # Standardize the features
@@ -591,4 +597,167 @@ report = classification_report(y_test, y_pred)
 print(report)
 
 
+
+
+# In[76]:
+
+
+### XGBOOST
+
+
+# In[77]:
+
+
+file_path = 'online_shoppers_intention.csv';
+bach_df = df_clean.copy();
+
+
+# In[78]:
+
+
+bach_df.info()
+
+
+# In[79]:
+
+
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.model_selection import train_test_split, GridSearchCV
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.metrics import accuracy_score
+
+
+# In[80]:
+
+
+class CorrelationFilter(BaseEstimator, TransformerMixin):
+    def __init__(self, threshold=0.1):
+        self.threshold = threshold
+        self.columns_to_drop_ = []
+
+    def fit(self, X, y):
+        numeric_columns = X.select_dtypes(include='number').columns
+        df_with_target = pd.concat([X, y.rename('target')], axis=1)
+        corr_matrix = df_with_target.corr()
+
+        self.columns_to_drop_ = [
+            col for col in numeric_columns
+            if abs(corr_matrix['target'][col]) < self.threshold
+        ]
+        return self
+
+    def transform(self, X):
+        return X.drop(columns=self.columns_to_drop_, errors='ignore')
+
+
+# In[81]:
+
+
+from sklearn.preprocessing import RobustScaler
+
+
+class MyRobustScaler(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.scaler = RobustScaler()
+        self.numeric_features = None
+
+    def fit(self, X, y=None):
+        self.numeric_features = X.select_dtypes(include='number').columns.tolist()
+        self.scaler.fit(X[self.numeric_features])
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        X[self.numeric_features] = self.scaler.transform(X[self.numeric_features])
+        return X
+
+
+
+# In[82]:
+
+
+class MyLabelEncoder(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.encoders = {}
+
+    def fit(self, X, y=None):
+        # Identify object (categorical) columns
+        self.categorical_columns = X.select_dtypes(include=['object']).columns
+        # Fit LabelEncoders for each categorical column
+        for col in self.categorical_columns:
+            self.encoders[col] = LabelEncoder().fit(X[col])
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        # Transform categorical columns using the fitted encoders
+        for col, encoder in self.encoders.items():
+            X[col] = encoder.transform(X[col])
+        return X
+
+
+# In[83]:
+
+
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
+
+# Define pipeline
+pipeline = Pipeline([
+    ('correlation_filter', CorrelationFilter(threshold=0.1)),
+    ('label_encode', MyLabelEncoder()),
+    ('robust_scaling', MyRobustScaler()),
+    ('xgboost', XGBClassifier(use_label_encoder=False, eval_metric='logloss'))
+])
+
+
+# In[84]:
+
+
+X = bach_df.drop(columns=['Revenue'])
+Y = bach_df['Revenue'].astype(int)
+
+
+# In[85]:
+
+
+value_counts = Y.value_counts()
+print(value_counts)
+
+
+# In[86]:
+
+
+ros = RandomOverSampler()
+X, Y = ros.fit_resample(X, Y)
+
+
+# In[87]:
+
+
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
+
+
+# In[88]:
+
+
+param_grid = {
+    'xgboost__n_estimators': [50, 100, 150],
+    'xgboost__max_depth': [3, 5, 7],
+    'xgboost__learning_rate': [0.01, 0.1, 0.2]
+}
+
+# GridSearchCV to find the best parameters
+grid_search = GridSearchCV(pipeline, param_grid, cv=3, scoring='accuracy', verbose=2)
+grid_search.fit(x_train, y_train)
+
+# Get the best parameters and evaluate the model
+best_pipeline = grid_search.best_estimator_
+y_pred = best_pipeline.predict(x_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f"Best Parameters: {grid_search.best_params_}")
+print(f"Test Accuracy: {accuracy:.4f}")
 
