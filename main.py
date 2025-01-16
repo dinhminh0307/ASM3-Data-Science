@@ -1,6 +1,20 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
+
+
+
+# In[1]:
+
+
 # # Assessment 3 - Online Shoppers Purchasing Intention
 # #### Objective: 
 
+
+# In[2]:
 
 
 # data manipulation
@@ -39,6 +53,8 @@ from IPython.display import display
 import warnings
 warnings.filterwarnings('ignore')
 
+
+# In[3]:
 
 
 # utility functions
@@ -89,6 +105,8 @@ def countplot_value(df, columns, figsize=(20, 30)):
 # ### 1.1. Data Loading
 
 
+# In[4]:
+
 
 # load the dataset
 file_path = 'online_shoppers_intention.csv'
@@ -98,15 +116,21 @@ df = pd.read_csv(file_path)
 # ### 1.2. Dataset Observation
 
 
+# In[5]:
+
 
 # display the first 5 rows of the dataset
 display(df.head())
 
 
+# In[6]:
+
 
 # summary of the dataset
 df.info()
 
+
+# In[7]:
 
 
 df.describe()
@@ -128,16 +152,22 @@ df.describe()
 # ### 1.3. Detailed Analysis and Cleaning
 
 
+# In[8]:
+
 
 # create a copy of the dataframe to store the cleaned data
 df_clean = df.copy();
 
+
+# In[9]:
 
 
 # display the unique values of the 'Month' and 'VisitorType' columns
 print(df_clean['Month'].unique())
 print(df_clean['VisitorType'].unique())
 
+
+# In[10]:
 
 
 # fix typos in the 'Month' column
@@ -150,6 +180,8 @@ df_clean = df_clean.sort_values('Month')
 print(df_clean['Month'].unique())
 
 
+# In[11]:
+
 
 # convert the 'Month' and 'Revenue' columns to numerical
 bool_columns = ['Weekend', 'Revenue']
@@ -161,11 +193,17 @@ df_clean.info()
 
 # #### 1.3.1. Univariate Analysis of Numerical values
 
+
+# In[12]:
+
+
 from sklearn.preprocessing import LabelEncoder
 encoder = LabelEncoder()
 df_clean['VisitorType'] = encoder.fit_transform(df_clean['VisitorType'])
 print(df_clean['VisitorType'])
 
+
+# In[13]:
 
 
 columns = ["Administrative", "Administrative_Duration", "Informational", "Informational_Duration",
@@ -184,6 +222,8 @@ plotbox_and_hist(df_clean, columns)
 
 # #### 1.3.2. Univariate Analysis of Categorical values
 
+
+# In[14]:
 
 
 columns = ["Month", "OperatingSystems", "Browser", "Region", "TrafficType", "VisitorType", "Weekend", "Revenue"]
@@ -207,12 +247,16 @@ countplot_value(df_clean, columns)
 # #### 1.3.3. Multivariate Analysis
 
 
+# In[15]:
+
 
 sns.pairplot(df_clean, hue="Revenue")
 
 
 # #### 1.3.4. Cleaning Data
 
+
+# In[16]:
 
 
 # remove outliers with low frequencies
@@ -228,6 +272,8 @@ df_clean = df_clean[((df_clean['Administrative'] < 25) &
                      (df_clean['PageValues'] < 250))]
 
 
+# In[17]:
+
 
 # verify removal
 rows_remove = len(df_temp) - len(df_clean)
@@ -238,6 +284,8 @@ print(f"The numbers of rows removed: {rows_remove}")
 
 # ### 2.1. Preprocessing Features and Plotting Correlations
 
+
+# In[18]:
 
 
 # since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
@@ -254,6 +302,8 @@ df_features = pd.concat([df_features, pd.get_dummies(df_features["VisitorType"],
 df_features.drop("Month", axis=1, inplace=True)
 df_features.drop("VisitorType", axis=1, inplace=True)
 
+
+# In[19]:
 
 
 # correlation analysis
@@ -286,10 +336,15 @@ ax = plt.title("Correlations between features")
 # ### 3.3. Classification
 
 
+# In[ ]:
 
 
 
 
+
+
+
+# In[20]:
 
 
 X = df_clean.drop(columns=['Revenue'])
@@ -299,6 +354,8 @@ Y = df_clean['Revenue'].astype(int)
 # ### Check the data imbalancing
 
 
+# In[21]:
+
 
 value_counts = Y.value_counts()
 print(value_counts)
@@ -307,6 +364,8 @@ print(value_counts)
 # ### Oversample the imbalance data
 # 
 
+
+# In[22]:
 
 
 from sklearn.preprocessing import StandardScaler
@@ -320,6 +379,8 @@ ros = RandomOverSampler()
 X_KNN, Y_KNN = ros.fit_resample(X, Y) # take more from the less class to increase its size
 
 
+# In[23]:
+
 
 value_counts = Y_KNN.value_counts()
 print(value_counts)
@@ -328,9 +389,13 @@ print(value_counts)
 # ## Spliting the data
 
 
+# In[24]:
+
 
 x_train, x_test, y_train, y_test = train_test_split(X_KNN, Y_KNN, test_size = 0.2, random_state = 0)
 
+
+# In[25]:
 
 
 # Standardize the features
@@ -339,6 +404,8 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
 
+# In[26]:
+
 
 param_dist = {
     'n_neighbors': randint(3, 15),
@@ -346,6 +413,8 @@ param_dist = {
     'metric': ['euclidean', 'manhattan', 'minkowski']
 }
 
+
+# In[27]:
 
 
 # Initialize the KNN classifier
@@ -356,16 +425,22 @@ random_search = RandomizedSearchCV(estimator=knn, param_distributions=param_dist
 random_search.fit(x_train, y_train)
 
 
+# In[28]:
+
 
 # Get the best parameters and best estimator
 best_params = random_search.best_params_
 best_knn = random_search.best_estimator_
 
 
+# In[29]:
+
 
 # Evaluate the best model
 y_pred = best_knn.predict(x_test)
 
+
+# In[30]:
 
 
 cm = confusion_matrix(y_test, y_pred)
@@ -374,6 +449,8 @@ disp.plot(cmap='Blues')
 plt.title('Confusion Matrix')
 plt.show()
 
+
+# In[31]:
 
 
 # Print the best parameters and evaluation metrics
@@ -385,25 +462,35 @@ print(classification_report(y_test, y_pred))
 print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
 
+# In[32]:
+
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 
+
+# In[33]:
 
 
 X = df_clean.drop('Revenue', axis=1)    
 y = df_clean['Revenue']
 
 
+# In[34]:
+
 
 # Splitting the dataset into the Training set and Test set
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
+# In[35]:
+
 
 # Initializing the RandomForestClassifier
 random_forest = RandomForestClassifier(random_state=42)
 
+
+# In[36]:
 
 
 # Setting up the GridSearch to find the best parameters
@@ -428,4 +515,167 @@ report = classification_report(y_test, y_pred)
 print(report)
 
 
+
+
+# In[76]:
+
+
+### XGBOOST
+
+
+# In[77]:
+
+
+file_path = 'online_shoppers_intention.csv';
+bach_df = df_clean.copy();
+
+
+# In[78]:
+
+
+bach_df.info()
+
+
+# In[79]:
+
+
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.model_selection import train_test_split, GridSearchCV
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.metrics import accuracy_score
+
+
+# In[80]:
+
+
+class CorrelationFilter(BaseEstimator, TransformerMixin):
+    def __init__(self, threshold=0.1):
+        self.threshold = threshold
+        self.columns_to_drop_ = []
+
+    def fit(self, X, y):
+        numeric_columns = X.select_dtypes(include='number').columns
+        df_with_target = pd.concat([X, y.rename('target')], axis=1)
+        corr_matrix = df_with_target.corr()
+
+        self.columns_to_drop_ = [
+            col for col in numeric_columns
+            if abs(corr_matrix['target'][col]) < self.threshold
+        ]
+        return self
+
+    def transform(self, X):
+        return X.drop(columns=self.columns_to_drop_, errors='ignore')
+
+
+# In[81]:
+
+
+from sklearn.preprocessing import RobustScaler
+
+
+class MyRobustScaler(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.scaler = RobustScaler()
+        self.numeric_features = None
+
+    def fit(self, X, y=None):
+        self.numeric_features = X.select_dtypes(include='number').columns.tolist()
+        self.scaler.fit(X[self.numeric_features])
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        X[self.numeric_features] = self.scaler.transform(X[self.numeric_features])
+        return X
+
+
+
+# In[82]:
+
+
+class MyLabelEncoder(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.encoders = {}
+
+    def fit(self, X, y=None):
+        # Identify object (categorical) columns
+        self.categorical_columns = X.select_dtypes(include=['object']).columns
+        # Fit LabelEncoders for each categorical column
+        for col in self.categorical_columns:
+            self.encoders[col] = LabelEncoder().fit(X[col])
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        # Transform categorical columns using the fitted encoders
+        for col, encoder in self.encoders.items():
+            X[col] = encoder.transform(X[col])
+        return X
+
+
+# In[83]:
+
+
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
+
+# Define pipeline
+pipeline = Pipeline([
+    ('correlation_filter', CorrelationFilter(threshold=0.1)),
+    ('label_encode', MyLabelEncoder()),
+    ('robust_scaling', MyRobustScaler()),
+    ('xgboost', XGBClassifier(use_label_encoder=False, eval_metric='logloss'))
+])
+
+
+# In[84]:
+
+
+X = bach_df.drop(columns=['Revenue'])
+Y = bach_df['Revenue'].astype(int)
+
+
+# In[85]:
+
+
+value_counts = Y.value_counts()
+print(value_counts)
+
+
+# In[86]:
+
+
+ros = RandomOverSampler()
+X, Y = ros.fit_resample(X, Y)
+
+
+# In[87]:
+
+
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
+
+
+# In[88]:
+
+
+param_grid = {
+    'xgboost__n_estimators': [50, 100, 150],
+    'xgboost__max_depth': [3, 5, 7],
+    'xgboost__learning_rate': [0.01, 0.1, 0.2]
+}
+
+# GridSearchCV to find the best parameters
+grid_search = GridSearchCV(pipeline, param_grid, cv=3, scoring='accuracy', verbose=2)
+grid_search.fit(x_train, y_train)
+
+# Get the best parameters and evaluate the model
+best_pipeline = grid_search.best_estimator_
+y_pred = best_pipeline.predict(x_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f"Best Parameters: {grid_search.best_params_}")
+print(f"Test Accuracy: {accuracy:.4f}")
 
