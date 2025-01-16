@@ -1,14 +1,6 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 # # Assessment 3 - Online Shoppers Purchasing Intention
 # #### Objective: 
 
-
-# In[2]:
 
 
 # data manipulation
@@ -47,8 +39,6 @@ from IPython.display import display
 import warnings
 warnings.filterwarnings('ignore')
 
-
-# In[3]:
 
 
 # utility functions
@@ -99,8 +89,6 @@ def countplot_value(df, columns, figsize=(20, 30)):
 # ### 1.1. Data Loading
 
 
-# In[4]:
-
 
 # load the dataset
 file_path = 'online_shoppers_intention.csv'
@@ -110,21 +98,15 @@ df = pd.read_csv(file_path)
 # ### 1.2. Dataset Observation
 
 
-# In[5]:
-
 
 # display the first 5 rows of the dataset
 display(df.head())
 
 
-# In[6]:
-
 
 # summary of the dataset
 df.info()
 
-
-# In[7]:
 
 
 df.describe()
@@ -146,22 +128,16 @@ df.describe()
 # ### 1.3. Detailed Analysis and Cleaning
 
 
-# In[8]:
-
 
 # create a copy of the dataframe to store the cleaned data
 df_clean = df.copy();
 
-
-# In[9]:
 
 
 # display the unique values of the 'Month' and 'VisitorType' columns
 print(df_clean['Month'].unique())
 print(df_clean['VisitorType'].unique())
 
-
-# In[10]:
 
 
 # fix typos in the 'Month' column
@@ -174,8 +150,6 @@ df_clean = df_clean.sort_values('Month')
 print(df_clean['Month'].unique())
 
 
-# In[11]:
-
 
 # convert the 'Month' and 'Revenue' columns to numerical
 bool_columns = ['Weekend', 'Revenue']
@@ -187,8 +161,11 @@ df_clean.info()
 
 # #### 1.3.1. Univariate Analysis of Numerical values
 
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+df_clean['VisitorType'] = encoder.fit_transform(df_clean['VisitorType'])
+print(df_clean['VisitorType'])
 
-# In[12]:
 
 
 columns = ["Administrative", "Administrative_Duration", "Informational", "Informational_Duration",
@@ -207,8 +184,6 @@ plotbox_and_hist(df_clean, columns)
 
 # #### 1.3.2. Univariate Analysis of Categorical values
 
-
-# In[13]:
 
 
 columns = ["Month", "OperatingSystems", "Browser", "Region", "TrafficType", "VisitorType", "Weekend", "Revenue"]
@@ -232,19 +207,12 @@ countplot_value(df_clean, columns)
 # #### 1.3.3. Multivariate Analysis
 
 
-# In[14]:
-
 
 sns.pairplot(df_clean, hue="Revenue")
 
 
-# ##### Analysis
-# My eyes
-
 # #### 1.3.4. Cleaning Data
 
-
-# In[15]:
 
 
 # remove outliers with low frequencies
@@ -260,8 +228,6 @@ df_clean = df_clean[((df_clean['Administrative'] < 25) &
                      (df_clean['PageValues'] < 250))]
 
 
-# In[16]:
-
 
 # verify removal
 rows_remove = len(df_temp) - len(df_clean)
@@ -270,8 +236,8 @@ print(f"The numbers of rows removed: {rows_remove}")
 
 # ## 2. Feature Engineering
 
+# ### 2.1. Preprocessing Features and Plotting Correlations
 
-# In[17]:
 
 
 # since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
@@ -279,14 +245,15 @@ print(f"The numbers of rows removed: {rows_remove}")
 df_features = df.copy()
 df_features = df_clean.drop(columns=["OperatingSystems", "Browser", "Region", "TrafficType"])
 
-# apply one-hot encoding to 'VisitorType' and concatenate with the original DataFrame
+# apply one-hot encoding to 'VisitorType' and 'Month' and concatenate with the original DataFrame
+df_features = pd.concat([df_features, pd.get_dummies(df_features["Month"], prefix='Month_')], axis=1)
 df_features = pd.concat([df_features, pd.get_dummies(df_features["VisitorType"], prefix='VisitorType_')], axis=1)
 
+
 # drop the original 'VisitorType' column
+df_features.drop("Month", axis=1, inplace=True)
 df_features.drop("VisitorType", axis=1, inplace=True)
 
-
-# In[18]:
 
 
 # correlation analysis
@@ -297,16 +264,18 @@ all_corr = df_features.corr(method = 'pearson')
 mask = np.zeros_like(all_corr, dtype=bool)
 mask[np.triu_indices_from(mask)] = True
 
-ax = plt.figure(figsize=(10, 10))
+ax = plt.figure(figsize=(15, 10))
 ax = sns.heatmap(all_corr, cmap='Blues', annot=True, fmt='.2f', mask = mask)
 ax = plt.xticks(rotation=85)
 ax = plt.title("Correlations between features")
 
 
-# ##### Hypothesis
-# 1. Regression
-# 2. Clustering
-# 3. Classification
+# ### 2.2. Analysis and Hypothesis Proposal
+# #### 2.2.1. Regression problem
+# 
+# #### 2.2.2. Clustering problem
+# 
+# #### 2.2.3. Classification problem
 
 # ## 3. Data Modelling
 
@@ -317,23 +286,18 @@ ax = plt.title("Correlations between features")
 # ### 3.3. Classification
 
 
-# In[ ]:
 
 
 
 
 
-# In[49]:
 
-
-X = df_features.drop(columns=['Revenue'])
-Y = df_features['Revenue'].astype(int)
+X = df_clean.drop(columns=['Revenue'])
+Y = df_clean['Revenue'].astype(int)
 
 
 # ### Check the data imbalancing
 
-
-# In[50]:
 
 
 value_counts = Y.value_counts()
@@ -343,8 +307,6 @@ print(value_counts)
 # ### Oversample the imbalance data
 # 
 
-
-# In[51]:
 
 
 from sklearn.preprocessing import StandardScaler
@@ -358,8 +320,6 @@ ros = RandomOverSampler()
 X_KNN, Y_KNN = ros.fit_resample(X, Y) # take more from the less class to increase its size
 
 
-# In[53]:
-
 
 value_counts = Y_KNN.value_counts()
 print(value_counts)
@@ -368,13 +328,9 @@ print(value_counts)
 # ## Spliting the data
 
 
-# In[54]:
-
 
 x_train, x_test, y_train, y_test = train_test_split(X_KNN, Y_KNN, test_size = 0.2, random_state = 0)
 
-
-# In[55]:
 
 
 # Standardize the features
@@ -383,8 +339,6 @@ x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
 
-# In[56]:
-
 
 param_dist = {
     'n_neighbors': randint(3, 15),
@@ -392,8 +346,6 @@ param_dist = {
     'metric': ['euclidean', 'manhattan', 'minkowski']
 }
 
-
-# In[57]:
 
 
 # Initialize the KNN classifier
@@ -404,22 +356,16 @@ random_search = RandomizedSearchCV(estimator=knn, param_distributions=param_dist
 random_search.fit(x_train, y_train)
 
 
-# In[58]:
-
 
 # Get the best parameters and best estimator
 best_params = random_search.best_params_
 best_knn = random_search.best_estimator_
 
 
-# In[59]:
-
 
 # Evaluate the best model
 y_pred = best_knn.predict(x_test)
 
-
-# In[60]:
 
 
 cm = confusion_matrix(y_test, y_pred)
@@ -428,8 +374,6 @@ disp.plot(cmap='Blues')
 plt.title('Confusion Matrix')
 plt.show()
 
-
-# In[61]:
 
 
 # Print the best parameters and evaluation metrics
@@ -441,35 +385,25 @@ print(classification_report(y_test, y_pred))
 print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
 
-# In[62]:
-
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 
 
-# In[63]:
 
+X = df_clean.drop('Revenue', axis=1)    
+y = df_clean['Revenue']
 
-X = df_features.drop('Revenue', axis=1)    
-y = df_features['Revenue']
-
-
-# In[64]:
 
 
 # Splitting the dataset into the Training set and Test set
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
-# In[65]:
-
 
 # Initializing the RandomForestClassifier
 random_forest = RandomForestClassifier(random_state=42)
 
-
-# In[66]:
 
 
 # Setting up the GridSearch to find the best parameters
@@ -492,7 +426,6 @@ y_pred = best_rf.predict(X_test)
 # Generating the classification report
 report = classification_report(y_test, y_pred)
 print(report)
-
 
 
 
