@@ -228,9 +228,6 @@ countplot_value(df_clean, columns)
 sns.pairplot(df_clean, hue="Revenue")
 
 
-# ##### Analysis
-# My eyes
-
 # #### 1.3.4. Cleaning Data
 
 # In[30]:
@@ -259,7 +256,9 @@ print(f"The numbers of rows removed: {rows_remove}")
 
 # ## 2. Feature Engineering
 
-# In[34]:
+# ### 2.1. Preprocessing Features and Plotting Correlations
+
+# In[43]:
 
 
 # since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
@@ -267,14 +266,17 @@ print(f"The numbers of rows removed: {rows_remove}")
 df_features = df.copy()
 df_features = df_clean.drop(columns=["OperatingSystems", "Browser", "Region", "TrafficType"])
 
-# apply one-hot encoding to 'VisitorType' and concatenate with the original DataFrame
+# apply one-hot encoding to 'VisitorType' and 'Month' and concatenate with the original DataFrame
+df_features = pd.concat([df_features, pd.get_dummies(df_features["Month"], prefix='Month_')], axis=1)
 df_features = pd.concat([df_features, pd.get_dummies(df_features["VisitorType"], prefix='VisitorType_')], axis=1)
 
+
 # drop the original 'VisitorType' column
+df_features.drop("Month", axis=1, inplace=True)
 df_features.drop("VisitorType", axis=1, inplace=True)
 
 
-# In[ ]:
+# In[44]:
 
 
 # correlation analysis
@@ -285,16 +287,18 @@ all_corr = df_features.corr(method = 'pearson')
 mask = np.zeros_like(all_corr, dtype=bool)
 mask[np.triu_indices_from(mask)] = True
 
-ax = plt.figure(figsize=(10, 10))
+ax = plt.figure(figsize=(15, 10))
 ax = sns.heatmap(all_corr, cmap='Blues', annot=True, fmt='.2f', mask = mask)
 ax = plt.xticks(rotation=85)
 ax = plt.title("Correlations between features")
 
 
-# ##### Hypothesis
-# 1. Regression
-# 2. Clustering
-# 3. Classification
+# ### 2.2. Analysis and Hypothesis Proposal
+# #### 2.2.1. Regression problem
+# 
+# #### 2.2.2. Clustering problem
+# 
+# #### 2.2.3. Classification problem
 
 # ## 3. Data Modelling
 
