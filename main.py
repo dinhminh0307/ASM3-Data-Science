@@ -1,6 +1,3 @@
-# # Assessment 3 - Online Shoppers Purchasing Intention
-# #### Objective: 
-
 # data manipulation
 import pandas as pd
 import numpy as np
@@ -16,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import (classification_report, confusion_matrix, roc_auc_score, 
                              roc_curve, accuracy_score, precision_score, recall_score, 
-                             f1_score, matthews_corrcoef)
+                             f1_score, matthews_corrcoef, silhouette_score, davies_bouldin_score)
 
 # dimensionality reduction
 from sklearn.decomposition import PCA
@@ -33,11 +30,19 @@ from imblearn.over_sampling import SMOTE
 # displaying outputs in jupyter
 from IPython.display import display
 
+from sklearn.mixture import GaussianMixture
+
 # ignore warnings
 import warnings
 warnings.filterwarnings('ignore')
 
-# utility functions
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
+
+from joblib import Parallel, delayed
+
 
 def plotbox_and_hist(df, columns, figsize=(30, 80)):
     fig, axes = plt.subplots(len(columns), 2, figsize=figsize)
@@ -79,17 +84,9 @@ def countplot_value(df, columns, figsize=(20, 30)):
     plt.tight_layout()
     plt.show()
 
-
-# ## 1. Retrieving and Preparing the Data
-
-# ### 1.1. Data Loading
-
 # load the dataset
 file_path = 'online_shoppers_intention.csv'
 df = pd.read_csv(file_path)
-
-
-# ### 1.2. Dataset Observation
 
 # display the first 5 rows of the dataset
 display(df.head())
@@ -98,22 +95,6 @@ display(df.head())
 df.info()
 
 df.describe()
-
-
-# ##### Analysis
-# The dataset contains 12,330 rows and 18 columns. There are no missing values across any of the columns, as all 18 attributes have 12,330 non-null entries.
-# 
-# The data types are primarily integers and floats, with a few categorical variables (object types) like **Month** and **VisitorType**, as well as Boolean variables like **Weekend** and **Revenue**. The attributes can be categorized as follows:
-# 
-# - Categorical values: **Month**, **VisitorType**.
-# - Numerical values:
-#   - Discrete: **Administrative**, **Informational**, **ProductRelated**, **OperatingSystems**, **Browser**, **Region**, **TrafficType**.
-#   - Continuous: **Administrative_Duration**, **Informational_Duration**, **ProductRelated_Duration**, **BounceRates**, **ExitRates**, **PageValues**, **SpecialDay**.
-#   
-# The **Revenue** column is a binary variable indicating whether a transaction resulted in revenue. The **Weekend** column is also Boolean, representing whether the visit occurred on the weekend.
-# Further analysis can be conducted to explore relationships between these variables, especially the conversion-related columns like **Revenue**.
-
-# ### 1.3. Detailed Analysis and Cleaning
 
 # create a copy of the dataframe to store the cleaned data
 df_clean = df.copy()
@@ -138,9 +119,6 @@ df_clean[bool_columns] = df_clean[bool_columns].astype(int)
 # verify the conversion
 df_clean.info()
 
-
-# #### 1.3.1. Univariate Analysis of Numerical values
-
 from sklearn.preprocessing import LabelEncoder
 encoder = LabelEncoder()
 df_clean['VisitorType'] = encoder.fit_transform(df_clean['VisitorType'])
@@ -152,40 +130,11 @@ columns = ["Administrative", "Administrative_Duration", "Informational", "Inform
 
 plotbox_and_hist(df_clean, columns)
 
-
-# ##### Analysis
-# - Histograms: Most features are right-skewed, with values concentrated on the lower end and long tails extending to higher values. Features like **Administrative** and **Administrative_Duration** show that most sessions involve minimal administrative activities, with outliers at higher values. **Informational** and **Informational_Duration** follow a similar pattern, suggesting that informational activities are not common in most sessions. **ProductRelated** and **ProductRelated_Duration** have a broader spread compared to administrative and informational features. This indicates more varied user engagement with product-related pages, although there are still some significant outliers. **BounceRates** and **ExitRates** are mostly near zero, showing that users usually stay on the site instead of leaving immediately. **PageValues** is skewed with most values being zero, while a few sessions have high values, showing only a small number of sessions generate significant revenue. **SpecialDay** has specific peaks that correspond to certain predefined special days in the data.
-# 
-# - Boxplots: Many features have visible outliers, represented by points beyond the whiskers of the boxplot. **Administrative_Duration** and **Informational_Duration** show tight interquartile ranges (IQRs) with outliers at higher values, confirming that most sessions have minimal durations for these activities. **ProductRelated_Duration** has a wider IQR, reflecting more variability in user interactions with product pages, but also includes a few extreme outliers. **BounceRates** and **ExitRates** have very narrow IQRs, with most values near zero, but occasional outliers suggest some sessions have high rates. **PageValues** has a compact IQR but includes extreme outliers, reflecting rare but impactful sessions with high page values. **SpecialDay** does not show significant outliers since its values are predefined and specific.
-# 
-# Further analysis will help us decide whether to clean datapoints, apply data imputation, or drop the problematic columns.
-
-# #### 1.3.2. Univariate Analysis of Categorical values
-
 columns = ["Month", "OperatingSystems", "Browser", "Region", "TrafficType", "VisitorType", "Weekend", "Revenue"]
 
 countplot_value(df_clean, columns)
 
-
-# ##### Analysis
-# There are heavy imbalances across all categorical variables, specifically:
-# - **Month**: March and November have the highest counts, while other months have significantly lower counts.
-# - **OperatingSystems**: Operating systems 1, 2, and 3 dominate the data, while other systems have lower counts.
-# - **Browser**: Browsers 1 and 2 have high counts, while other browsers show much lower counts.
-# - **Region**: Regions 1 and 2 represent most of the data, with other regions showing significantly lower counts.
-# - **TrafficType**: Traffic types 1 and 2 have higher counts, while other types are underrepresented.
-# - **VisitorType**: Returning visitors are the most common, while new visitors and the 'other' category are less frequent.
-# - **Weekend**: Non-weekend visits have the highest count, while weekend visits are much less frequent.
-# - **Revenue**: Non-revenue generating visits dominate, while revenue-generating visits are much fewer.
-# 
-# Overall, imbalances could adversely affect the accuracy of predictions or analyses. Data imputation techniques might be considered to address this issue.
-
-# #### 1.3.3. Multivariate Analysis
-
 sns.pairplot(df_clean, hue="Revenue")
-
-
-# #### 1.3.4. Cleaning Data
 
 # remove outliers with low frequencies
 df_temp = df_clean.copy()
@@ -203,11 +152,6 @@ df_clean = df_clean[((df_clean['Administrative'] < 25) &
 rows_remove = len(df_temp) - len(df_clean)
 print(f"The numbers of rows removed: {rows_remove}")
 
-
-# ## 2. Feature Engineering
-
-# ### 2.1. Preprocessing Features and Plotting Correlations
-
 # since we do not have enough context to extract meaning from the values of categorical variables such as 'OperatingSystems', 'Browser', 'Region', and 'TrafficType', 
 # we will drop these columns.
 df_features = df.copy()
@@ -216,7 +160,6 @@ df_features = df_clean.drop(columns=["OperatingSystems", "Browser", "Region", "T
 # apply one-hot encoding to 'VisitorType' and 'Month' and concatenate with the original DataFrame
 df_features = pd.concat([df_features, pd.get_dummies(df_features["Month"], prefix='Month_')], axis=1)
 df_features = pd.concat([df_features, pd.get_dummies(df_features["VisitorType"], prefix='VisitorType_')], axis=1)
-
 
 # drop the original 'VisitorType' column
 df_features.drop("Month", axis=1, inplace=True)
@@ -235,75 +178,238 @@ ax = sns.heatmap(all_corr, cmap='Blues', annot=True, fmt='.2f', mask = mask)
 ax = plt.xticks(rotation=85)
 ax = plt.title("Correlations between features")
 
+# copy the cleaned dataframe
+df_cluster = df_clean.copy()
 
+# define model parameters
+model_target = 'Revenue'
+model_features = ['Administrative', 'Administrative_Duration', 'Informational', 
+                 'Informational_Duration', 'ProductRelated', 'ProductRelated_Duration',
+                 'BounceRates', 'ExitRates', 'PageValues', 'SpecialDay']
 
-# ## 3. Data Modelling
+# prepare the data
+df_cluster = df_cluster[model_features]
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_features = scaler.fit_transform(df_cluster[model_features])
+df_cluster[model_features] = scaled_features
 
-# ### 3.1. Regression
+# determine optimal number of pca components using explained variance ratio
+pca_full = PCA()
+pca_full.fit(df_cluster[model_features])
+explained_variance_ratio = np.cumsum(pca_full.explained_variance_ratio_)
+n_components = np.argmax(explained_variance_ratio >= 0.95) + 1  # keep 95% of variance
 
-# ### 3.2. Clustering
+# apply pca with optimal components
+pca = PCA(n_components=n_components)
+pca_features = pca.fit_transform(df_cluster[model_features])
 
-# ### 3.3. Classification
+def fit_gmm(n_components, covariance_type, init_params, max_iter, pca_features):
+    gmm = GaussianMixture(
+        n_components=n_components,
+        covariance_type=covariance_type,
+        init_params=init_params,
+        max_iter=max_iter,
+        random_state=42
+    )
+    gmm.fit(pca_features)
+    bic = gmm.bic(pca_features)
+    return bic, gmm
 
+best_bic = float('inf')
+best_gmm_bic = None
+best_n_components = None
+best_covariance_type = None
+best_init_params = None
+best_max_iter = None
 
-# ### 2.2. Analysis and Hypothesis Proposal
-# #### 2.2.1. Regression problem
-#  
-# #### 2.2.2. Clustering problem
-#  
-# #### 2.2.3. Classification problem
-# ##### 1. Visitor Engagement
-# - **Observation**: Scatterplots of `Administrative_Duration`, `Informational_Duration`, and `ProductRelated_Duration` against `Revenue` often show higher densities of sessions with greater durations linked to purchases (`Revenue = True`).
-#   - `PageValues` seems to have a strong positive correlation with `Revenue`. Higher page values indicate a higher likelihood of purchases, aligning with the hypothesis.
-# 
-# - **Hypothesis**: Higher engagement leads to higher purchase probabilities.
-#   - Higher values for `Administrative_Duration`, `Informational_Duration`, and `ProductRelated_Duration` might indicate greater visitor interest, resulting in purchases.
-#   - A higher `PageValues` score is likely to correlate positively with purchases.
-# 
-# ##### 2. Bounce and Exit Rates
-# - **Observation**: From scatterplots of `BounceRates` and `ExitRates` against `Revenue`, sessions with higher bounce rates (`BounceRates`) and exit rates (`ExitRates`) generally correspond to no purchases (`Revenue = False`), which supports the hypothesis of poor user experience reducing purchase likelihood.
-# 
-# - **Hypothesis**: Poor user experience decreases purchase likelihood.
-#   - Higher `BounceRates` and `ExitRates` might indicate user dissatisfaction, leading to fewer purchases.
-# 
-# ##### 3. Time Factors
-# - **Observation**: Visualizations of `SpecialDay` against `Revenue` show an increase in purchases as the proximity to a special day increases. Similarly, analysis of `Month` against `Revenue` highlights seasonal trends, with months like November showing higher purchase probabilities, likely due to shopping holidays like Black Friday.
-# 
-# - **Hypothesis**: Shopping behavior depends on timing.
-#   - Visits closer to a `SpecialDay` (e.g., Black Friday or holidays) might have a higher likelihood of purchases.
-#   - Certain months (`Month`) might reflect seasonal shopping trends, influencing purchase behavior.
-# 
-# ##### 4. User Types
-# - **Observation**: From categorical plots of `VisitorType` and `Revenue`, returning visitors have a noticeably higher likelihood of generating revenue compared to new visitors. This observation supports the hypothesis that returning visitors are more likely to purchase.
-# 
-# - **Hypothesis**: Returning visitors are more likely to purchase.
-#   - Returning visitors (`VisitorType = Returning_Visitor`) might have a higher likelihood of making a purchase compared to new visitors (`VisitorType = New_Visitor`).
-# 
-# ##### 5. Technical Features
-# - **Observation**: Bar charts and heatmaps for `OperatingSystems`, `Browser`, and `TrafficType` reveal varying purchase probabilities across categories. For instance, some browsers or traffic sources have a stronger association with purchases, supporting the hypothesis that technical accessibility impacts purchases.
-# 
-# - **Hypothesis**: Technical accessibility impacts purchases.
-#   - Different `OperatingSystems`, `Browser`, and `TrafficType` values might influence the likelihood of purchases based on usability or accessibility.
-# 
-# ##### 6. Weekend Influence
-# - **Observation**: A categorical plot of `Weekend` against `Revenue` shows slight differences in purchase likelihood between weekend and weekday sessions. This observation suggests some behavioral differences in shopping patterns based on the day of the week.
-# - **Hypothesis**: Shopping behavior differs on weekends.
-#   - Visits during weekends (`Weekend = True`) might have different purchase rates compared to weekday visits.
-# 
-# ---
+# define the grid of hyperparameters to search
+param_grid = [(n_components, covariance_type, init_params, max_iter) 
+              for n_components in range(2, 21)
+              for covariance_type in ['full', 'tied', 'diag', 'spherical']
+              for init_params in ['kmeans', 'random']
+              for max_iter in [100, 200, 300]]
+
+# use parallel processing for hyperparameter search
+results = Parallel(n_jobs=-1)(
+    delayed(fit_gmm)(n_components, covariance_type, init_params, max_iter, pca_features)
+    for (n_components, covariance_type, init_params, max_iter) in param_grid
+)
+
+# extract best gmm based on bic
+for bic, gmm in results:
+    if bic < best_bic:
+        best_bic = bic
+        best_gmm_bic = gmm
+
+# predict with the best gmm model
+gmm_clusters = best_gmm_bic.predict(pca_features)
+
+# visualize the clusters
+plt.scatter(pca_features[:, 0], pca_features[:, 1], c=gmm_clusters, cmap='viridis')  # Use gmm_clusters
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.title('Clusters Visualization with Best GMM Model')
+plt.show()
+
+# print the best model parameters
+print(f'Best BIC: {best_bic}')
+print(f'Best number of components: {best_n_components}')
+print(f'Best covariance type: {best_covariance_type}')
+print(f'Best init params: {best_init_params}')
+print(f'Best max iterations: {best_max_iter}')
+
+# add cluster labels to the DataFrame
+df_cluster['Cluster'] = gmm_clusters
+
+# analyze cluster characteristics
+cluster_summary = df_cluster.groupby('Cluster')[model_features].mean()
+print(cluster_summary)
+
+# add the target variable back to the DataFrame for analysis
+df_cluster[model_target] = df_clean[model_target]
+
+# link clusters to hypothesis by checking purchase rates
+purchase_rate = df_cluster.groupby('Cluster')[model_target].mean()
+print(purchase_rate)
+
+from joblib import Parallel, delayed
+from sklearn.cluster import DBSCAN
+from sklearn.metrics import silhouette_score
+import numpy as np
+
+def fit_dbscan(eps, min_samples, pca_features):
+    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+    clusters = dbscan.fit_predict(pca_features)
+
+    # Skip if all points are noise
+    if len(np.unique(clusters)) <= 1:
+        return -1, None  # Return -1 for invalid score
+
+    try:
+        score = silhouette_score(pca_features, clusters)
+        return score, dbscan
+    except:
+        return -1, None  # Return -1 in case of error
+
+best_silhouette = -1
+best_eps = None
+best_min_samples = None
+best_dbscan = None
+
+# Define parameter ranges
+eps_range = np.arange(0.1, 1.1, 0.1)
+min_samples_range = range(5, 21, 5)
+
+# Create the parameter grid
+param_grid = [(eps, min_samples) for eps in eps_range for min_samples in min_samples_range]
+
+# Use parallel processing for the grid search
+results = Parallel(n_jobs=-1)(
+    delayed(fit_dbscan)(eps, min_samples, pca_features) for eps, min_samples in param_grid
+)
+
+# Process results to find the best model based on silhouette score
+for score, dbscan in results:
+    if score > best_silhouette:
+        best_silhouette = score
+        best_dbscan = dbscan
+        best_eps = dbscan.eps
+        best_min_samples = dbscan.min_samples
+
+# Train final model with best parameters
+final_dbscan = DBSCAN(eps=best_eps, min_samples=best_min_samples)
+dbscan_clusters = final_dbscan.fit_predict(pca_features)
+
+# visualize results
+plt.figure(figsize=(10, 6))
+plt.scatter(pca_features[:, 0], pca_features[:, 1], c=clusters, cmap='viridis')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.title('DBSCAN Clustering Results')
+plt.colorbar(label='Cluster')
+plt.show()
+
+# print best parameters for DBSCAN model
+print(f'Best eps: {best_eps}')
+print(f'Best min_samples: {best_min_samples}')
+print(f'Best silhouette score: {best_silhouette}')
+print(f'Number of clusters found: {len(np.unique(dbscan_clusters[dbscan_clusters != -1]))}')  # Use dbscan_clusters
+print(f'Number of noise points: {len(dbscan_clusters[dbscan_clusters == -1])}')  # Use dbscan_clusters
+
+# add cluster labels to the dataframe
+df_cluster['Cluster'] = dbscan_clusters
+
+# analyze cluster characteristics
+cluster_summary = df_cluster.groupby('Cluster')[model_features].mean()
+print(cluster_summary)
+
+# add the target variable back to the dataframe for analysis
+df_cluster[model_target] = df_clean[model_target]
+
+# link clusters to hypothesis by checking purchase rates
+purchase_rate = df_cluster.groupby('Cluster')[model_target].mean()
+print(purchase_rate)
+
+# remove noise from DBSCAN results for evaluation
+filtered_dbscan_clusters = dbscan_clusters[dbscan_clusters != -1]
+filtered_dbscan_features = pca_features[dbscan_clusters != -1]
+
+# DBSCAN Metrics
+if len(np.unique(filtered_dbscan_clusters)) > 1:
+    dbscan_silhouette = silhouette_score(filtered_dbscan_features, filtered_dbscan_clusters)
+    dbscan_dbi = davies_bouldin_score(filtered_dbscan_features, filtered_dbscan_clusters)
+else:
+    dbscan_silhouette = None
+    dbscan_dbi = None
+dbscan_noise_percentage = np.sum(dbscan_clusters == -1) / len(dbscan_clusters)
+
+# GMM Metrics
+if len(np.unique(gmm_clusters)) > 1:
+    gmm_silhouette = silhouette_score(pca_features, gmm_clusters)
+    gmm_dbi = davies_bouldin_score(pca_features, gmm_clusters)
+else:
+    gmm_silhouette = None
+    gmm_dbi = None
+
+# add target variable to compare purity
+df_cluster[model_target] = df_clean[model_target]
+
+# purity function
+def purity_score(true_labels, predicted_clusters):
+    contingency_matrix = pd.crosstab(predicted_clusters, true_labels)
+    return np.sum(np.amax(contingency_matrix.values, axis=1)) / len(true_labels)
+
+# purity for DBSCAN (excluding noise)
+dbscan_purity = purity_score(df_cluster[model_target][dbscan_clusters != -1], filtered_dbscan_clusters)
+
+# purity for GMM
+gmm_purity = purity_score(df_cluster[model_target], gmm_clusters)
+
+# output results
+print("DBSCAN Metrics:")
+if dbscan_silhouette is not None:
+    print(f" - Silhouette Score: {dbscan_silhouette}")
+    print(f" - Davies-Bouldin Index: {dbscan_dbi}")
+else:
+    print(" - Silhouette Score: Not applicable (only one cluster)")
+    print(" - Davies-Bouldin Index: Not applicable (only one cluster)")
+print(f" - Noise Percentage: {dbscan_noise_percentage:.2%}")
+print(f" - Purity Score: {dbscan_purity}")
+
+print("\nGMM Metrics:")
+if gmm_silhouette is not None:
+    print(f" - Silhouette Score: {gmm_silhouette}")
+    print(f" - Davies-Bouldin Index: {gmm_dbi}")
+else:
+    print(" - Silhouette Score: Not applicable (only one cluster)")
+    print(" - Davies-Bouldin Index: Not applicable (only one cluster)")
+print(f" - Purity Score: {gmm_purity}")
 
 X = df_clean.drop(columns=['Revenue'])
 Y = df_clean['Revenue'].astype(int)
 
-
-# ### Check the data imbalancing
-
 value_counts = Y.value_counts()
 print(value_counts)
-
-
-# ### Oversample the imbalance data
-# 
 
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import RandomOverSampler
@@ -317,9 +423,6 @@ X_KNN, Y_KNN = ros.fit_resample(X, Y) # take more from the less class to increas
 
 value_counts = Y_KNN.value_counts()
 print(value_counts)
-
-
-# ## Spliting the data
 
 from sklearn.feature_selection import RFE
 from sklearn.inspection import permutation_importance
@@ -346,8 +449,6 @@ perm_importance_df = pd.DataFrame({
 # Save or print the results
 print(perm_importance_df)  # To print the importance scores
 perm_importance_df.to_csv('permutation_importance.csv', index=False)  # Save as CSV file
-
-## Select features to feed
 
 selected_features = [
     "PageValues",
@@ -454,9 +555,6 @@ plt.legend(loc="lower right")
 plt.show()
 
 
-### XGBOOST
-
-
 
 file_path = 'online_shoppers_intention.csv'
 bach_df = df_clean.copy()
@@ -498,7 +596,6 @@ class CorrelationFilter(BaseEstimator, TransformerMixin):
 
 
 from sklearn.preprocessing import RobustScaler
-
 
 class MyRobustScaler(BaseEstimator, TransformerMixin):
     def __init__(self):
