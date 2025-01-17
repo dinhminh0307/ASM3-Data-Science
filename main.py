@@ -490,7 +490,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 random_forest = RandomForestClassifier(random_state=42)
 
 
-# In[36]:
+# In[ ]:
 
 
 # Setting up the GridSearch to find the best parameters
@@ -517,39 +517,41 @@ print(report)
 
 
 
-# In[76]:
+# In[38]:
 
 
 ### XGBOOST
 
 
-# In[77]:
+# In[7]:
 
 
 file_path = 'online_shoppers_intention.csv';
-bach_df = df_clean.copy();
+bach_df = pd.read_csv(file_path)
 
 
-# In[78]:
+# In[ ]:
 
 
 bach_df.info()
 
 
-# In[79]:
+# In[1]:
 
 
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, RobustScaler
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import train_test_split, GridSearchCV
-from imblearn.over_sampling import RandomOverSampler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
+from xgboost import XGBRegressor
+from sklearn.pipeline import Pipeline
 
 
-# In[80]:
+# In[2]:
 
 
+# Custom Correlation Filter
 class CorrelationFilter(BaseEstimator, TransformerMixin):
     def __init__(self, threshold=0.1):
         self.threshold = threshold
@@ -570,12 +572,10 @@ class CorrelationFilter(BaseEstimator, TransformerMixin):
         return X.drop(columns=self.columns_to_drop_, errors='ignore')
 
 
-# In[81]:
+# In[3]:
 
 
-from sklearn.preprocessing import RobustScaler
-
-
+# Custom Robust Scaler
 class MyRobustScaler(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.scaler = RobustScaler()
@@ -592,90 +592,106 @@ class MyRobustScaler(BaseEstimator, TransformerMixin):
         return X
 
 
+# In[4]:
 
-# In[82]:
 
-
+# Custom Label Encoder
 class MyLabelEncoder(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.encoders = {}
 
     def fit(self, X, y=None):
-        # Identify object (categorical) columns
         self.categorical_columns = X.select_dtypes(include=['object']).columns
-        # Fit LabelEncoders for each categorical column
         for col in self.categorical_columns:
             self.encoders[col] = LabelEncoder().fit(X[col])
         return self
 
     def transform(self, X):
         X = X.copy()
-        # Transform categorical columns using the fitted encoders
         for col, encoder in self.encoders.items():
             X[col] = encoder.transform(X[col])
         return X
 
 
-# In[83]:
+# In[5]:
 
 
-from sklearn.pipeline import Pipeline
-from xgboost import XGBClassifier
-
-# Define pipeline
+# Define Pipeline with Preprocessing and XGBoost Regressor
 pipeline = Pipeline([
     ('correlation_filter', CorrelationFilter(threshold=0.1)),
     ('label_encode', MyLabelEncoder()),
     ('robust_scaling', MyRobustScaler()),
-    ('xgboost', XGBClassifier(use_label_encoder=False, eval_metric='logloss'))
+    ('xgboost', XGBRegressor())
 ])
 
 
-# In[84]:
+# In[ ]:
 
 
+# Load and prepare data
+bach_df = df_clean.copy()
 X = bach_df.drop(columns=['Revenue'])
-Y = bach_df['Revenue'].astype(int)
+Y = bach_df['Revenue']
 
 
-# In[85]:
+# In[ ]:
 
 
-value_counts = Y.value_counts()
-print(value_counts)
+# Train-Test Split
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=0)
 
 
-# In[86]:
+# In[48]:
 
 
-ros = RandomOverSampler()
-X, Y = ros.fit_resample(X, Y)
-
-
-# In[87]:
-
-
-x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 0)
-
-
-# In[88]:
-
-
+# Parameter Grid for GridSearchCV
 param_grid = {
     'xgboost__n_estimators': [50, 100, 150],
     'xgboost__max_depth': [3, 5, 7],
-    'xgboost__learning_rate': [0.01, 0.1, 0.2]
+    'xgboost__learning_rate': [0.01, 0.1, 0.2],
+    'xgboost__subsample': [0.7, 0.8, 1.0],
+    'xgboost__colsample_bytree': [0.7, 0.8, 1.0],
+    'xgboost__gamma': [0, 0.1, 0.2]
 }
 
-# GridSearchCV to find the best parameters
-grid_search = GridSearchCV(pipeline, param_grid, cv=3, scoring='accuracy', verbose=2)
+
+# In[49]:
+
+
+# GridSearchCV for Hyperparameter Tuning
+grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_absolute_error', verbose=2)
 grid_search.fit(x_train, y_train)
 
-# Get the best parameters and evaluate the model
-best_pipeline = grid_search.best_estimator_
-y_pred = best_pipeline.predict(x_test)
-accuracy = accuracy_score(y_test, y_pred)
 
+# In[ ]:
+
+
+# Get the best pipeline from GridSearchCV
+best_pipeline = grid_search.best_estimator_
+
+
+# In[ ]:
+
+
+# Predictions on Test Data
+y_pred = best_pipeline.predict(x_test)
+
+
+# In[ ]:
+
+
+# Evaluate the Model
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+rmse = mean_squared_error(y_test, y_pred, squared=False)
+
+
+# In[ ]:
+
+
+# Display Results
 print(f"Best Parameters: {grid_search.best_params_}")
-print(f"Test Accuracy: {accuracy:.4f}")
+print(f"Test MAE: {mae:.4f}")
+print(f"Test R²: {r2:.4f}")
+print(f"Test RMSE: {rmse:.4f}")
 
